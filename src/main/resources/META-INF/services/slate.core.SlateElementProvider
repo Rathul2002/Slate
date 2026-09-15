@@ -1,0 +1,4 @@
+slate.desktop.javafx.elements.WindowElement.WindowElementProvider
+slate.desktop.javafx.elements.ViewElement.ViewElementProvider
+slate.desktop.javafx.elements.TextElement.TextElementProvider
+slate.desktop.javafx.elements.ButtonElement.ButtonElementProvider
