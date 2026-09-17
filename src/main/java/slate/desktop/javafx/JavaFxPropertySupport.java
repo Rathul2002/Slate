@@ -121,6 +121,58 @@ public final class JavaFxPropertySupport {
     }
 
     /**
+     * Reads a finite floating-point property.
+     *
+     * <p>NaN and positive/negative infinity are rejected because they do not
+     * represent a meaningful static native UI value.</p>
+     */
+    public static double getFiniteDouble(ComponentTreeNode node, String name, double defaultValue) {
+        double value = getDouble(node, name, defaultValue);
+
+        if (!Double.isFinite(value)) {
+            throw invalidProperty(node, name, value, "finite number", null);
+        }
+
+        return value;
+    }
+
+    /**
+     * Reads a finite positive floating-point property.
+     *
+     * <p>The returned value must be greater than zero.</p>
+     */
+    public static double getPositiveDouble(ComponentTreeNode node, String name, double defaultValue) {
+        double value = getFiniteDouble(node, name, defaultValue);
+
+        if (value <= 0) {
+            throw invalidProperty(
+                    node,
+                    name,
+                    value,
+                    "positive finite number",
+                    null
+            );
+        }
+
+        return value;
+    }
+
+    /**
+     * Reads a finite non-negative floating-point property.
+     *
+     * <p>Zero is accepted. Negative values are rejected.</p>
+     */
+    public static double getNonNegativeDouble(ComponentTreeNode node, String name, double defaultValue) {
+        double value = getFiniteDouble(node, name, defaultValue);
+
+        if (value < 0) {
+            throw invalidProperty(node, name, value, "non-negative finite number", null);
+        }
+
+        return value;
+    }
+
+    /**
      * Reads a static boolean property.
      *
      * <p>Only true and false are accepted for textual values. Invalid values

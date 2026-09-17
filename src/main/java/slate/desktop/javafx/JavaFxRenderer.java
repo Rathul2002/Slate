@@ -11,37 +11,43 @@ import slate.core.renderer.RendererProvider;
 /**
  * Coordinates rendering of a resolved Slate component tree using JavaFX.
  *
- * <p>The renderer owns the application Window for the current lifecycle,
- * while JavaFxRuntime owns the JavaFX toolkit.</p>
+ * <p>The renderer owns the native application window for the current Slate
+ * application lifecycle. {@link JavaFxRuntime} owns the JavaFX toolkit
+ * lifecycle.</p>
  *
- * <p>Individual element rendering is delegated to JavaFxRenderContext and
- * JavaFxElementRegistry.</p>
+ * <p>Individual Slate elements are delegated to {@link JavaFxRenderContext}
+ * and {@link JavaFxElementRegistry} so that the renderer remains a lifecycle
+ * coordinator rather than an element-specific renderer.</p>
  */
 public final class JavaFxRenderer implements Renderer {
-
-    private static final String DEFAULT_TITLE = "Slate Application";
-    private static final double DEFAULT_WIDTH = 800;
-    private static final double DEFAULT_HEIGHT = 600;
-    private static final boolean DEFAULT_RESIZABLE = true;
 
     private final JavaFxElementRegistry elementRegistry;
     private final JavaFxComponentMountManager componentMountManager;
     private final JavaFxRenderContext renderContext;
 
     /*
-     * The current Slate lifecycle has one application window.
+     * The current application model supports one native application window
+     * for one Slate runtime lifecycle.
      *
-     * The reference is intentionally kept inside the JavaFX backend so the
-     * renderer can manage the window lifecycle without exposing JavaFX types
-     * to slate.core.
+     * These references belong only to the JavaFX backend and therefore do not
+     * leak JavaFX types into slate.core.
      */
     private Stage applicationStage;
     private boolean mounted;
 
+    /**
+     * Creates a JavaFX renderer with the standard discovered element
+     * renderers.
+     */
     public JavaFxRenderer() {
         this(new JavaFxElementRegistry());
     }
 
+    /**
+     * Creates a renderer using the supplied element registry.
+     *
+     * @param elementRegistry registry containing JavaFX element renderers
+     */
     public JavaFxRenderer(JavaFxElementRegistry elementRegistry) {
         if (elementRegistry == null) {
             throw new IllegalArgumentException("Element registry cannot be null");
@@ -86,59 +92,126 @@ public final class JavaFxRenderer implements Renderer {
         }
 
         /*
-         * Read the Window configuration from the resolved Slate tree before
-         * creating the native Stage. This keeps the XML property model as the
-         * source of truth rather than exposing JavaFX Stage configuration to
-         * application code.
+         * Convert the resolved Window properties into one validated immutable
+         * backend configuration before creating native UI.
          */
-        String title = JavaFxPropertySupport.getString(root, "title", DEFAULT_TITLE);
-
-        double width = JavaFxPropertySupport.getDouble(root, "width", DEFAULT_WIDTH);
-
-        double height = JavaFxPropertySupport.getDouble(root, "height", DEFAULT_HEIGHT);
-
-        boolean resizable = JavaFxPropertySupport.getBoolean(root, "resizable", DEFAULT_RESIZABLE);
-
-        validateWindowDimensions(width, height);
+        JavaFxWindowConfiguration configuration = JavaFxWindowConfiguration.from(root);
 
         Stage stage = new Stage();
 
-        /*
-         * The baseline View/Window layout currently uses VBox. This remains
-         * an implementation detail of the desktop backend and can later be
-         * replaced by proper Slate layout semantics.
-         */
-        VBox rootContainer = new VBox();
+        try {
+            /*
+             * The current backend uses VBox as the temporary root layout
+             * container. Final layout semantics will eventually belong to
+             * Slate/CSS rather than this backend implementation detail.
+             */
+            VBox rootContainer = new VBox();
 
-        for (ComponentTreeNode child : root.getChildren()) {
+            for (ComponentTreeNode child : root.getChildren()) {
+                Node nativeNode = renderContext.render(child);
 
-            Node nativeNode = renderContext.render(child);
-
-            if (nativeNode != null) {
-                rootContainer.getChildren().add(nativeNode);
+                if (nativeNode != null) {
+                    rootContainer.getChildren().add(nativeNode);
+                }
             }
+
+            /*
+             * The resolved Window dimensions are used to create the initial
+             * native Scene size.
+             */
+            Scene scene = new Scene(
+                    rootContainer,
+                    configuration.getWidth(),
+                    configuration.getHeight()
+            );
+
+            /*
+             * Apply all static Window properties in one place.
+             */
+            configuration.applyTo(stage);
+
+            stage.setScene(scene);
+
+            /*
+             * Slate explicitly owns application shutdown. The close request
+             * is consumed so the backend can first release its own component
+             * ownership records.
+             */
+            stage.setOnCloseRequest(event -> {
+                event.consume();
+                shutdownApplication();
+            });
+
+            /*
+             * The renderer becomes the owner of the Stage only after the
+             * native scene has been constructed successfully.
+             */
+            applicationStage = stage;
+            mounted = true;
+
+            /*
+             * The native window must be visible before applying initial
+             * maximized/fullscreen state so that the state belongs to the
+             * actual displayed application window.
+             */
+            stage.show();
+            configuration.applyInitialState(stage);
+
+        } catch (RuntimeException | Error failure) {
+            cleanupFailedMount(stage);
+            throw failure;
+        }
+    }
+
+    /**
+     * Shuts down the current Slate application window lifecycle.
+     *
+     * <p>This method runs on the JavaFX application thread because it is
+     * normally reached from a JavaFX Stage close event.</p>
+     */
+    private void shutdownApplication() {
+        /*
+         * Clearing backend component ownership is safe here because the
+         * application lifecycle is ending. Reconciliation-level native
+         * subtree detachment is still a later feature.
+         */
+        componentMountManager.clear();
+
+        Stage stage = applicationStage;
+
+        applicationStage = null;
+        mounted = false;
+
+        /*
+         * JavaFxRuntime owns the actual JavaFX toolkit shutdown.
+         */
+        JavaFxRuntime.shutdown();
+
+        /*
+         * The Stage normally disappears as part of Platform.exit().
+         * Keeping the local reference only for the shutdown operation avoids
+         * exposing native window ownership beyond this renderer.
+         */
+        if (stage != null && stage.isShowing()) {
+            stage.hide();
+        }
+    }
+
+    /**
+     * Releases backend ownership when application mounting fails before the
+     * lifecycle becomes fully established.
+     */
+    private void cleanupFailedMount(Stage stage) {
+        componentMountManager.clear();
+
+        if (applicationStage == stage) {
+            applicationStage = null;
+            mounted = false;
         }
 
-        Scene scene = new Scene(rootContainer, width, height);
-
-        stage.setTitle(title);
-        stage.setResizable(resizable);
-        stage.setScene(scene);
-
-        /*
-         * Slate controls the application lifecycle. The close request is
-         * consumed so JavaFX does not independently decide the toolkit
-         * lifecycle before Slate has performed its shutdown operation.
-         */
-        stage.setOnCloseRequest(event -> {
-            event.consume();
-            JavaFxRuntime.shutdown();
-        });
-
-        applicationStage = stage;
-        mounted = true;
-
-        stage.show();
+        if (stage.isShowing()) {
+            stage.hide();
+        }
     }
 
     /**
@@ -156,21 +229,6 @@ public final class JavaFxRenderer implements Renderer {
             );
         }
     }
-
-    /**
-     * Prevents invalid window dimensions from reaching the native backend.
-     */
-    private void validateWindowDimensions(double width, double height) {
-
-        if (!Double.isFinite(width) || width <= 0) {
-            throw new IllegalArgumentException("Window width must be a positive finite number: " + width);
-        }
-
-        if (!Double.isFinite(height) || height <= 0) {
-            throw new IllegalArgumentException("Window height must be a positive finite number: " + height);
-        }
-    }
-
 
     public JavaFxElementRegistry getElementRegistry() {
         return elementRegistry;
@@ -192,6 +250,15 @@ public final class JavaFxRenderer implements Renderer {
     public Stage getApplicationStage() {
         return applicationStage;
     }
+
+    /**
+     * Indicates whether this renderer currently owns a mounted application
+     * window.
+     */
+    public boolean isMounted() {
+        return mounted;
+    }
+
 
     /**
      * ServiceLoader provider for the JavaFX renderer backend.

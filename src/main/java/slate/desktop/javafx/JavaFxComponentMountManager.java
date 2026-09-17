@@ -13,6 +13,10 @@ import java.util.Map;
  * <p>Component identity is runtime-instance identity, not component name.
  * Therefore, two usages of the same ComponentDefinition receive independent
  * native mounts.</p>
+ *
+ * <p>The manager owns the backend association between a ComponentInstance and
+ * its native subtree. Actual scene-graph attachment state is observed by
+ * JavaFxComponentMount itself.</p>
  */
 public final class JavaFxComponentMountManager {
 
@@ -23,7 +27,11 @@ public final class JavaFxComponentMountManager {
     }
 
     /**
-     * Creates and registers a mount for a component instance.
+     * Creates and registers a native mount for a component instance.
+     *
+     * <p>Creating a mount does not itself mean that the native subtree is
+     * attached. JavaFxComponentMount observes the JavaFX parent relationship
+     * and updates its mounted state when the native tree changes.</p>
      */
     public JavaFxComponentMount createMount(ComponentInstance componentInstance, Node rootNode) {
         if (componentInstance == null) {
@@ -42,38 +50,6 @@ public final class JavaFxComponentMountManager {
         JavaFxComponentMount mount = new JavaFxComponentMount(componentInstance, rootNode);
 
         mounts.put(componentInstance, mount);
-
-        return mount;
-    }
-
-    /**
-     * Marks a registered mount as attached to the native tree.
-     */
-    public void mount(ComponentInstance componentInstance) {
-        JavaFxComponentMount mount = requireMount(componentInstance);
-
-        mount.markMounted();
-    }
-
-    /**
-     * Removes the ownership record for a component instance.
-     *
-     * <p>Native parent removal is intentionally not implemented yet. That
-     * belongs to the later full mounting/reconciliation model.</p>
-     */
-    public JavaFxComponentMount unmount(ComponentInstance componentInstance) {
-        if (componentInstance == null) {
-            throw new IllegalArgumentException("Component instance cannot be null");
-        }
-
-        JavaFxComponentMount mount = mounts.remove(componentInstance);
-
-        if (mount == null) {
-            throw new IllegalStateException("No native mount exists for component instance: "
-                    + componentInstance.getName());
-        }
-
-        mount.markUnmounted();
 
         return mount;
     }
@@ -115,32 +91,16 @@ public final class JavaFxComponentMountManager {
     }
 
     /**
-     * Clears all backend ownership records.
+     * Releases every backend ownership record.
      *
-     * <p>Native tree detachment will be handled by the later full mount
-     * lifecycle implementation.</p>
+     * <p>This is used when the current application lifecycle ends or when a
+     * partially-created render must be discarded.</p>
      */
     public void clear() {
-
         for (JavaFxComponentMount mount : mounts.values()) {
-            mount.markUnmounted();
+            mount.dispose();
         }
 
         mounts.clear();
-    }
-
-    private JavaFxComponentMount requireMount(ComponentInstance componentInstance) {
-        if (componentInstance == null) {
-            throw new IllegalArgumentException("Component instance cannot be null");
-        }
-
-        JavaFxComponentMount mount = mounts.get(componentInstance);
-
-        if (mount == null) {
-            throw new IllegalStateException("No native mount exists for component instance: "
-                                                + componentInstance.getName());
-        }
-
-        return mount;
     }
 }

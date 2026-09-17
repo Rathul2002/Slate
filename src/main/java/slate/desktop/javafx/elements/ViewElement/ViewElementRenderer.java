@@ -47,7 +47,7 @@ public final class ViewElementRenderer implements JavaFxElementRenderer {
             ComponentTreeNode node,
             VBox view
     ) {
-        double spacing = JavaFxPropertySupport.getDouble(node, "spacing", view.getSpacing());
+        double spacing = JavaFxPropertySupport.getNonNegativeDouble(node, "spacing", view.getSpacing());
 
         view.setSpacing(spacing);
     }

@@ -110,8 +110,13 @@ public final class JavaFxRenderContext {
     /**
      * Creates the native subtree belonging to one component instance.
      *
-     * <p>The component itself does not create an additional JavaFX Node.
-     * Its resolved internal root becomes the native root of the mount.</p>
+     * <p>The component boundary itself does not create an additional JavaFX
+     * node. Its resolved internal root becomes the native root owned by the
+     * component mount.</p>
+     *
+     * <p>The resulting mount initially represents an unattached native
+     * subtree. JavaFxComponentMount observes the JavaFX scene graph and
+     * changes its mounted state when that root receives a parent.</p>
      */
     private Node renderComponent(ComponentTreeNode node) {
 
@@ -125,6 +130,10 @@ public final class JavaFxRenderContext {
             throw new IllegalStateException("Component node does not contain a runtime component instance: " + node.getType());
         }
 
+        if (componentMountManager.find(componentInstance) != null) {
+            throw new IllegalStateException("Component instance is already mounted: " + componentInstance.getName());
+        }
+
         ComponentInstance previousOwner = currentComponentOwner;
 
         /*
@@ -136,16 +145,7 @@ public final class JavaFxRenderContext {
         try {
             Node nativeRoot = render(node.getChildren().get(0));
 
-            /*
-             * A ComponentInstance may only own one native subtree.
-             */
-            if (componentMountManager.find(componentInstance) != null) {
-                throw new IllegalStateException("Component instance is already mounted: " + componentInstance.getName());
-            }
-
             componentMountManager.createMount(componentInstance, nativeRoot);
-
-            componentMountManager.mount(componentInstance);
 
             return nativeRoot;
 
