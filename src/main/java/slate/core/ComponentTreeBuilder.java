@@ -2,7 +2,6 @@ package slate.core;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Converts raw Slate XML nodes into the resolved runtime component tree.
@@ -88,19 +87,18 @@ public class ComponentTreeBuilder {
             ComponentTreeNode componentRoot = buildNode(definition.getRoot(), nextStack);
 
             /*
-             * IMPORTANT:
-             *
              * The definition is shared metadata.
-             * The instance belongs to this particular <Home /> usage.
+             *
+             * The props belong to this particular component usage.
+             *
+             * ComponentTreeNode.component(...) now creates the
+             * ComponentInstance with those exact props.
              */
-            ComponentInstance componentInstance = ComponentInstance.create(definition);
-
             return ComponentTreeNode.component(
                     type,
                     node.getProps(),
                     List.of(componentRoot),
-                    definition,
-                    componentInstance
+                    definition
             );
         }
 

@@ -68,6 +68,10 @@ public final class ComponentTreeNode {
             throw new IllegalArgumentException("Component instance must belong to the supplied component definition");
         }
 
+        if (kind == Kind.COMPONENT && !componentInstance.getProps().equals(props)) {
+            throw new IllegalArgumentException("Component tree props must match component instance props");
+        }
+
 
         this.kind = kind;
         this.type = type;
@@ -124,7 +128,7 @@ public final class ComponentTreeNode {
                 props,
                 children,
                 definition,
-                ComponentInstance.create(definition)
+                ComponentInstance.create(definition, props)
         );
     }
 

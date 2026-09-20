@@ -5,6 +5,7 @@ import slate.core.ComponentInstance;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 /**
  * Provides the first native event bridge for Slate's JavaFX backend.
@@ -17,6 +18,9 @@ import java.lang.reflect.Method;
  * directly attaching JavaFX listeners.</p>
  */
 public final class JavaFxEventSupport {
+
+    private JavaFxEventSupport() {
+    }
 
     /**
      * Binds the Slate {@code onClick} property of a Button to the owning
@@ -47,6 +51,11 @@ public final class JavaFxEventSupport {
 
         Object behavior = componentInstance.getBehaviorInstance();
 
+        if (behavior == null) {
+            throw new IllegalStateException("Component reports a behavior but its behavior instance is null: "
+                            + componentInstance.getName());
+        }
+
         Method method = findHandlerMethod(behavior.getClass(), handlerName);
 
         button.setOnAction(event -> invokeHandler(
@@ -65,24 +74,37 @@ public final class JavaFxEventSupport {
      * lifecycle is established.</p>
      */
     private static Method findHandlerMethod(Class<?> behaviorClass, String handlerName) {
-        try {
-            Method method = behaviorClass.getMethod(handlerName);
+        Method[] methods = behaviorClass.getMethods();
+
+        for (Method method : methods) {
+
+            if (!method.getName().equals(handlerName)) {
+                continue;
+            }
 
             if (method.getParameterCount() != 0) {
                 throw new IllegalStateException("Click handler must have zero parameters: "
                                 + behaviorClass.getName()
                                 + "."
-                                + handlerName);
+                                + handlerName
+                );
+            }
+
+            if (method.getDeclaringClass() == Object.class) {
+                throw new IllegalStateException("Click handler cannot be an Object method: " + handlerName);
+            }
+
+            if (Modifier.isStatic(method.getModifiers())) {
+                throw new IllegalStateException("Click handler must be an instance method: " + behaviorClass.getName()
+                                                            + "." + handlerName);
             }
 
             return method;
-
-        } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("No zero-argument click handler found: "
-                            + behaviorClass.getName()
-                            + "."
-                            + handlerName, e);
         }
+
+        throw new IllegalStateException(
+                "No public zero-argument click handler found: " + behaviorClass.getName()
+                        + "." + handlerName);
     }
 
     /**
@@ -98,11 +120,8 @@ public final class JavaFxEventSupport {
         try {
             method.invoke(behavior);
         } catch (IllegalAccessException e) {
-            throw new IllegalStateException("Cannot access click handler '"
-                            + handlerName
-                            + "' on component: "
-                            + componentName, e);
-
+            throw new IllegalStateException("Cannot access click handler '" + handlerName + "' on component: "
+                                                        + componentName, e);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
 

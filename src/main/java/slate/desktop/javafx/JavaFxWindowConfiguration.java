@@ -89,13 +89,13 @@ final class JavaFxWindowConfiguration {
                 DEFAULT_TITLE
         );
 
-        double width = JavaFxPropertySupport.getDouble(
+        double width = JavaFxPropertySupport.getPositiveDouble(
                 node,
                 "width",
                 DEFAULT_WIDTH
         );
 
-        double height = JavaFxPropertySupport.getDouble(
+        double height = JavaFxPropertySupport.getPositiveDouble(
                 node,
                 "height",
                 DEFAULT_HEIGHT
@@ -107,25 +107,25 @@ final class JavaFxWindowConfiguration {
                 DEFAULT_RESIZABLE
         );
 
-        double minWidth = JavaFxPropertySupport.getDouble(
+        double minWidth = JavaFxPropertySupport.getNonNegativeDouble(
                 node,
                 "minWidth",
                 DEFAULT_MIN_WIDTH
         );
 
-        double minHeight = JavaFxPropertySupport.getDouble(
+        double minHeight = JavaFxPropertySupport.getNonNegativeDouble(
                 node,
                 "minHeight",
                 DEFAULT_MIN_HEIGHT
         );
 
-        double maxWidth = JavaFxPropertySupport.getDouble(
+        double maxWidth = JavaFxPropertySupport.getPositiveDouble(
                 node,
                 "maxWidth",
                 DEFAULT_MAX_WIDTH
         );
 
-        double maxHeight = JavaFxPropertySupport.getDouble(
+        double maxHeight = JavaFxPropertySupport.getPositiveDouble(
                 node,
                 "maxHeight",
                 DEFAULT_MAX_HEIGHT
