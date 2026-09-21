@@ -30,12 +30,12 @@ public final class JavaFxEventSupport {
      * @param componentInstance the Slate component that owns the button
      * @param handlerName the Java behavior method name
      */
-    public static void bindButtonClick(Button button, ComponentInstance componentInstance, String handlerName) {
+    public static void bindButtonClick(Button button, ComponentInstance declarationOwner, String handlerName) {
         if (button == null) {
             throw new IllegalArgumentException("Button cannot be null");
         }
 
-        if (componentInstance == null) {
+        if (declarationOwner == null) {
             throw new IllegalArgumentException("Component instance cannot be null");
         }
 
@@ -43,17 +43,17 @@ public final class JavaFxEventSupport {
             throw new IllegalArgumentException("Click handler name cannot be null or empty");
         }
 
-        if (!componentInstance.hasBehavior()) {
+        if (!declarationOwner.hasBehavior()) {
             throw new IllegalStateException("Button click handler '" + handlerName
                             + "' requires a behavior instance for component: "
-                            + componentInstance.getName());
+                            + declarationOwner.getName());
         }
 
-        Object behavior = componentInstance.getBehaviorInstance();
+        Object behavior = declarationOwner.getBehaviorInstance();
 
         if (behavior == null) {
             throw new IllegalStateException("Component reports a behavior but its behavior instance is null: "
-                            + componentInstance.getName());
+                            + declarationOwner.getName());
         }
 
         Method method = findHandlerMethod(behavior.getClass(), handlerName);
@@ -61,9 +61,9 @@ public final class JavaFxEventSupport {
         button.setOnAction(event -> invokeHandler(
                 method,
                 behavior,
-                componentInstance.getName(),
-                handlerName
-        ));
+                declarationOwner.getName(),
+                handlerName)
+        );
     }
 
     /**

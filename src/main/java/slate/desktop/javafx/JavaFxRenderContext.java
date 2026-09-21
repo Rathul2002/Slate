@@ -72,7 +72,7 @@ public final class JavaFxRenderContext {
      * <p>The explicit owner is primarily used when crossing a component
      * boundary.</p>
      */
-    public Node render(ComponentTreeNode node, ComponentInstance ownerComponent) {
+    public Node render(ComponentTreeNode node, ComponentInstance renderingOwner) {
         if (node == null) {
             throw new IllegalArgumentException("Render node cannot be null");
         }
@@ -102,7 +102,7 @@ public final class JavaFxRenderContext {
          *
          * The owner is inherited from the component currently being rendered.
          */
-        bindEvents(node, nativeNode, ownerComponent);
+        bindEvents(node, nativeNode);
 
         return nativeNode;
     }
@@ -120,8 +120,11 @@ public final class JavaFxRenderContext {
      */
     private Node renderComponent(ComponentTreeNode node) {
 
-        if (node.getChildren().size() != 1) {
-            throw new IllegalStateException("Component node must contain exactly one resolved root: " + node.getType());
+        ComponentTreeNode internalRoot = node.getInternalRoot();
+
+        if (internalRoot == null) {
+            throw new IllegalStateException("Component node must contain one resolved internal root: "
+                            + node.getType());
         }
 
         ComponentInstance componentInstance = node.getComponentInstance();
@@ -143,7 +146,7 @@ public final class JavaFxRenderContext {
         currentComponentOwner = componentInstance;
 
         try {
-            Node nativeRoot = render(node.getChildren().get(0));
+            Node nativeRoot = render(internalRoot);
 
             componentMountManager.createMount(componentInstance, nativeRoot);
 
@@ -163,10 +166,7 @@ public final class JavaFxRenderContext {
      *
      * <p>The first event supported by Slate is Button.onClick.</p>
      */
-    private void bindEvents(ComponentTreeNode node, Node nativeNode, ComponentInstance ownerComponent) {
-        if (ownerComponent == null) {
-            return;
-        }
+    private void bindEvents(ComponentTreeNode node, Node nativeNode) {
 
         Object onClick = node.getProps().get("onClick");
 
@@ -182,6 +182,13 @@ public final class JavaFxRenderContext {
             throw new IllegalStateException("Button onClick must contain a non-empty handler method name");
         }
 
-        JavaFxEventSupport.bindButtonClick(button, ownerComponent, handlerName);
+        ComponentInstance declarationOwner = node.getDeclarationOwner();
+
+        if (declarationOwner == null) {
+            throw new IllegalStateException("Button click handler '" + handlerName
+                            + "' has no component declaration owner");
+        }
+
+        JavaFxEventSupport.bindButtonClick(button, declarationOwner, handlerName);
     }
 }
