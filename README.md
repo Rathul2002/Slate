@@ -242,9 +242,9 @@ The goal is a project structure that is immediately understandable: **UI, style,
 
 ### Implementation Progress
 
-**69 implemented** · **29 remaining** · **70% of tracked roadmap items complete**
+**69 implemented** · **29 remaining (the number of remaining items may increase as development progresses)** · **55% of tracked roadmap items complete**
 
-`██████████████░░░░░░` **70%**
+`███████████░░░░░░░░░` **55%**
 
 The framework has moved beyond its initial bootstrap stage. Slate now has a working foundation for application startup, component discovery and loading, component trees, content projection, renderer abstraction, a JavaFX backend, native mounting, basic events, and props.
 
